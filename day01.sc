@@ -3,7 +3,7 @@ import scala.util.matching.Regex
 
 val input = loadPackets(List("day01.txt"))
 
-def firstDigit(line: String, regex: Regex): Option[Int] = regex.findFirstIn(line).map({
+def parse(value: String): Int = value match {
   case "one" => 1
   case "two" => 2
   case "three" => 3
@@ -14,7 +14,8 @@ def firstDigit(line: String, regex: Regex): Option[Int] = regex.findFirstIn(line
   case "eight" => 8
   case "nine" => 9
   case d => d.charAt(0) - '0'
-})
+}
+def firstDigit(line: String, regex: Regex): Option[Int] = regex.findFirstIn(line).map(parse)
 def lastDigit(line: String, regex: Regex):Int = line.indices.map(line.substring).flatMap(firstDigit(_, regex)).last
 def calibrationValue(line: String, regex: Regex): Int = 10 * firstDigit(line, regex).get + lastDigit(line, regex)
 
