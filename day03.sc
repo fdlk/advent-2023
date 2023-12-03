@@ -1,33 +1,36 @@
 import common.loadPackets
-import scala.util.matching.Regex
 
 val input = loadPackets(List("day03.txt"))
 
-val symbols = input.zipWithIndex
-  .flatMap { case (line, rownum) =>
-    line.zipWithIndex
-      .flatMap {
-        case ('.', _) => None
-        case (c, colnum) if !c.isDigit => Some(rownum, colnum)
-        case _ => None
-      }
+case class Point(row: Int, col: Int) {
+  def isAdjacentTo(other: Point): Boolean = Math.abs(row - other.row) <= 1 && Math.abs(col - other.col) <= 1
+}
+
+case class Symbol(location: Point, char: Char) {
+  def isGear: Boolean = char == '*'
+  def isSymbol: Boolean = char != '.' && !char.isDigit
+}
+
+case class PartNumber(row: Int, cols: Range, number: Int) {
+  def isAdjacentTo(symbol: Symbol): Boolean = cols.map(Point(row, _)).exists(symbol.location.isAdjacentTo)
+}
+
+val symbols = input.zipWithIndex.flatMap {
+  case (line, row) => line.zipWithIndex.map {
+    case (char, col) => Symbol(Point(row, col), char)
   }
+}.filter(_.isSymbol)
 
-val partNumberRegex = """\d+""".r
+val partNumbers: List[PartNumber] = input.zipWithIndex.flatMap {
+  case (line, row) => """\d+""".r.findAllMatchIn(line)
+    .map(m => PartNumber(row, m.start until m.end, m.group(0).toInt))
+}.filter(partNumber => symbols.exists(partNumber.isAdjacentTo))
 
-def getPartNumber(m: Regex.Match, linenum: Int): Option[Int] =
-  (for (
-    colnum <- m.start - 1 to m.start + m.group(0).length;
-    rownum <- linenum - 1 to linenum + 1
-    if symbols.contains((rownum, colnum))
-  ) yield m.group(0).toInt).headOption
+val part1 = partNumbers.map(_.number).sum
 
-def findPartNumbers(line: String, linenum: Int): Iterator[Int] =
-  partNumberRegex.findAllMatchIn(line)
-    .flatMap(m => getPartNumber(m, linenum))
+def gearRatio(gear: Symbol): Option[Int] =
+  Some(partNumbers.filter(p => p.isAdjacentTo(gear)))
+    .filter(_.length == 2)
+    .map(_.map(_.number).product)
 
-findPartNumbers(input.head, 0).toList
-
-val part1 = input.zipWithIndex.flatMap {
-  case (line, rownum) => findPartNumbers(line, rownum)
-}.sum
+val part2 = symbols.filter(_.isGear).flatMap(gearRatio).sum
