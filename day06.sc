@@ -1,5 +1,4 @@
 import common.loadPackets
-import scala.collection.immutable.NumericRange
 
 val input = loadPackets(List("day06.txt"))
 
