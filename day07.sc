@@ -1,55 +1,46 @@
 import common.loadPackets
-import scala.math.Ordered.orderingToOrdered
 import scala.math.Ordering.Implicits.seqOrdering
 
 val input = loadPackets(List("day07.txt"))
 
 object Cards extends Enumeration {
   type Card = Value
-
-  val Ace = Value(1, "A")
-  val King = Value(2, "K")
-  val Queen = Value(3, "Q")
-  val Jack = Value(4, "J")
-  val Ten = Value(5, "T")
-  val Nine = Value(6, "9")
-  val Eight = Value(7, "8")
-  val Seven = Value(8, "7")
-  val Six = Value(9, "6")
-  val Five = Value(10, "5")
-  val Four = Value(11, "4")
-  val Three = Value(12, "3")
-  val Two = Value(13, "2")
+  val Joker = Value("*")
+  val Two = Value("2")
+  val Three = Value("3")
+  val Four = Value("4")
+  val Five = Value("5")
+  val Six = Value("6")
+  val Seven = Value("7")
+  val Eight = Value("8")
+  val Nine = Value("9")
+  val Ten = Value("T")
+  val Jack = Value("J")
+  val Queen = Value("Q")
+  val King = Value("K")
+  val Ace = Value("A")
 }
 
-object HandTypes extends Enumeration {
-  type HandType = Value
-
-  val FiveOfAKind, FourOfAKind, FullHouse, ThreeOfAKind, TwoPair, OnePair, HighCard = Value
-}
-
-case class Hand(cards: List[Cards.Card], bid: Int) extends Ordered[Hand]{
-
-  val handType: HandTypes.HandType = {
-    cards.groupMapReduce(card => card)(_ => 1)(_+_).values.toList.sorted match {
-      case List(5) => HandTypes.FiveOfAKind
-      case List(1, 4) => HandTypes.FourOfAKind
-      case List(2, 3) => HandTypes.FullHouse
-      case List(1, 1, 3) => HandTypes.ThreeOfAKind
-      case List(1, 2, 2) => HandTypes.TwoPair
-      case x if x.contains(2) => HandTypes.OnePair
-      case _ => HandTypes.HighCard
-    }
+case class Hand(cards: List[Cards.Card], bid: Int) {
+  val counts: List[Int] = count(cards)
+  val cardsWithJoker: List[Cards.Card] = cards.map {
+    case Cards.Jack => Cards.Joker
+    case other => other
   }
-  def compare(that: Hand): Int = (handType, cards) compare (that.handType, that.cards)
+  val countsWithJoker: List[Int] = count(cardsWithJoker.filter(_ != Cards.Joker)) match {
+    case most :: rest => most + cardsWithJoker.count(_ == Cards.Joker) :: rest
+    case Nil => List(5)
+  }
+
+  def count(cards: List[Cards.Card]): List[Int] =
+    cards.groupMapReduce(card => card)(_ => 1)(_ + _).values.toList.sorted.reverse
 }
 
-def parseHand(hand: String): Hand = hand match {
-  case s"$cards $bid" => Hand(
-    cards.map(card => Cards.values.find(v => v.toString.charAt(0) == card).get).toList,
-    bid.toInt)
+val hands: List[Hand] = input.map {
+  case s"$cards $bid" => Hand(cards.map(_.toString).map(Cards.withName).toList, bid.toInt)
 }
 
-val hands: List[Hand] = input.map(parseHand)
+def ranks(hands: List[Hand]): Int = hands.map(_.bid).zipWithIndex.map { case (bid, index) => bid * (index + 1) }.sum
 
-hands.sorted.reverse.map(_.bid).zipWithIndex.map{case (bid, index) => bid * (index + 1)}.sum
+val part1 = ranks(hands.sortBy(hand => (hand.counts, hand.cards)))
+val part2 = ranks(hands.sortBy(hand => (hand.countsWithJoker, hand.cardsWithJoker)))
