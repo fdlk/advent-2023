@@ -73,6 +73,11 @@ package object common {
     }
   }
 
+  // https://stackoverflow.com/questions/40875537/fp-lcm-in-scala-in-1-line
+  def lcm(list: Seq[Long]): Long = list.foldLeft(1: Long) {
+    (a, b) => b * a / LazyList.iterate((a, b)) { case (x, y) => (y, x % y) }.dropWhile(_._2 != 0).head._1.abs
+  }
+
   trait Grid[T] {
     def heuristicDistance(from: T, to: T): Int
 
