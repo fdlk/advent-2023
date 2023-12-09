@@ -1,15 +1,11 @@
 import common.loadPackets
 
-val input = loadPackets(List("day09.txt")).map(_.split("\\s+").map(_.toInt).toList)
+val input: List[Seq[Int]] = loadPackets(List("day09.txt")).map(_.split("\\s+").map(_.toInt))
 
-def next(series: Seq[Int]): Int =
-  if (series.forall(_ == 0)) 0
-  else series.last + next(series.sliding(2).map { case List(a, b) => b - a }.toSeq)
+val diffs: List[LazyList[Seq[Int]]] = input.map(
+  LazyList.iterate(_)(_.sliding(2).map { case Seq(a, b) => b - a }.toSeq)
+    .takeWhile(_.exists(_ != 0))
+)
 
-val part1 = input.map(next).sum
-
-def prev(series: Seq[Int]): Int =
-  if (series.forall(_ == 0)) 0
-  else series.head - prev(series.sliding(2).map { case List(a, b) => b - a }.toSeq)
-
-val part2 = input.map(prev).sum
+val part1 = diffs.flatMap(_.map(_.last)).sum
+val part2 = diffs.map(_.map(_.head).reduceRight(_ - _)).sum
