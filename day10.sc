@@ -20,12 +20,12 @@ val maze = input.zipWithIndex.flatMap { case (line, row) =>
 val pipes = Map('|' -> "NS", '-' -> "EW", 'L' -> "NE", 'J' -> "NW", '7' -> "SW", 'F' -> "SE")
 val opposite = Map('N' -> 'S', 'E' -> 'W', 'W' -> 'E', 'S' -> 'N')
 val startingDirection = 'S'
-val startingEnteringFrom = 'E'
+val startingEnteringFrom = 'N'
 
 case class State(pos: Point, enteringFrom: Char) {
   val pipe: Char = maze(pos)
   lazy val direction: Char = if (pipe == 'S') startingDirection else pipes(pipe).filter(_ != enteringFrom).charAt(0)
-  val movingUp: Boolean = enteringFrom == 'S' || direction == 'N'
+  val movingNorth: Boolean = enteringFrom == 'S' || direction == 'N'
   def next(): State = State(pos.move(direction), opposite(direction))
 }
 
@@ -46,4 +46,4 @@ val part2 =
   input.indices.flatMap(row => input.head.indices.map(col => Point(row, col)))
     .filter(!loop.keySet(_))
     .flatMap(moveEastToLoop)
-    .count(_.movingUp)
+    .count(_.movingNorth)
