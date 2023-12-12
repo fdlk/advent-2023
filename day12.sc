@@ -13,13 +13,15 @@ case class Problem(springs: String, broken: List[Int]) {
   }
   val done = broken.isEmpty
   val solved = done && !springs.contains('#')
+
+  def unfold: Problem = Problem(List(springs, springs, springs, springs, springs).mkString("?"), broken ::: broken ::: broken ::: broken ::: broken)
 }
 
 val input = loadPackets(List("day12.txt")).map{
   case s"${springs} ${broken}" => Problem(springs, broken.split(",").map(_.toInt).toList)
 }
 
-def options(problem: Problem): Int = {
+def options(problem: Problem): Long = {
   if (problem.done)
     if (problem.solved) 1 else 0
   else (0 to problem.toDistribute)
@@ -29,3 +31,5 @@ def options(problem: Problem): Int = {
 }
 
 val part1 = input.map(options).sum
+
+val part2 = input.map(_.unfold).map(options).sum
