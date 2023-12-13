@@ -1,56 +1,53 @@
-import common.loadPackets
+import common.{loadPackets, time}
+
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 
 case class Problem(springs: String, broken: List[Int]) {
-  val toDistribute = springs.length - broken.sum - (broken.length - 1)
+  lazy val firstBrokenForSure = springs.indexOf('#')
+  lazy val undecided = springs.length - broken.sum - (broken.length - 1)
 
   def startingWith(working: Int): Option[Problem] = {
-    val toSubtract = List.fill(working)('.') ::: List.fill(broken.head)('#') ::: List('.').filter(_ => broken.length > 1)
-    if (toSubtract.zip(springs).forall {
-      case (_, '?') => true
-      case (a, b) if a != b => false
-      case _ => true
-    }) Some(Problem(springs.substring(toSubtract.length), broken.tail))
-    else None
+    if (!((working + broken.head <= springs.length) &&
+      springs.substring(0, working).forall(_ != '#') &&
+      springs.substring(working, working + broken.head).forall(_ != '.') &&
+      (broken.tail.isEmpty || ((springs.length > working + broken.head) && springs.charAt(working + broken.head) != '#')))) None
+    else
+      Some(Problem(springs.substring(working + broken.head + (if(broken.length > 1) 1 else 0)), broken.tail))
   }
 
   lazy val noRoomForLeftoverBroken = springs.count(_ != '.') < broken.sum
   lazy val noRoomForLeftoverWorking = springs.count(_ != '#') < broken.length - 1
   lazy val notEnoughSpringsLeft = springs.count(_ == '#') > broken.sum
-  lazy val impossible = noRoomForLeftoverBroken || noRoomForLeftoverWorking || notEnoughSpringsLeft || toDistribute < 0
+  lazy val impossible = noRoomForLeftoverBroken || noRoomForLeftoverWorking || notEnoughSpringsLeft || undecided < 0
   lazy val done = broken.isEmpty || impossible
-  lazy val solved = broken.isEmpty && !springs.contains('#')
+  lazy val solved = broken.isEmpty && firstBrokenForSure == -1
 
-  def unfold: Problem = {
-    println("*")
-    Problem(List(springs, springs, springs, springs, springs).mkString("?"), broken ::: broken ::: broken ::: broken ::: broken)
-  }
+  def unfold: Problem = Problem(List.fill(5)(springs).mkString("?"), List.fill(5)(broken).flatten)
 }
 
 val input = loadPackets(List("day12.txt")).map {
   case s"${springs} ${broken}" => Problem(springs, broken.split(",").map(_.toInt).toList)
 }
 
-def stillSolvable(problem: Problem): Boolean = {
-  if (problem.done)
-    problem.solved
-  else (0 to problem.toDistribute).par
-    .flatMap(problem.startingWith)
-    .exists(stillSolvable)
+def memoize[K, V](f: K => V): K => V = {
+  val cache = scala.collection.mutable.Map.empty[K, V]
+  k => cache.getOrElseUpdate(k, f(k))
 }
 
-def options(problem: Problem): Long = {
+def memoizedOptions: (Problem => Long) = memoize((problem) =>
   if (problem.done)
     if (problem.solved) 1 else 0
-  else if (true)
-    (0 to problem.toDistribute).flatMap(problem.startingWith)
-      .map(options)
-      .sum
-  else 0
+  else (0 to problem.undecided).par.flatMap(problem.startingWith)
+    .map(memoizedOptions)
+    .sum
+)
+
+val part1 = time {
+  input.map(memoizedOptions).sum
 }
-
-
-val part1 = input.map(options).sum
-
-options(input(3).unfold)
-//151047661L
+time {
+  memoizedOptions(input(3).unfold)
+}
+val part2 = time {
+  input.map(_.unfold).map(memoizedOptions).sum
+}
