@@ -15,14 +15,21 @@ case class Problem(springs: String, broken: List[Int]) {
       Some(Problem(springs.substring(working + broken.head + (if(broken.length > 1) 1 else 0)), broken.tail))
   }
 
-  lazy val noRoomForLeftoverBroken = springs.count(_ != '.') < broken.sum
-  lazy val noRoomForLeftoverWorking = springs.count(_ != '#') < broken.length - 1
-  lazy val notEnoughSpringsLeft = springs.count(_ == '#') > broken.sum
-  lazy val impossible = noRoomForLeftoverBroken || noRoomForLeftoverWorking || notEnoughSpringsLeft || undecided < 0
-  lazy val done = broken.isEmpty || impossible
+  lazy val done = broken.isEmpty
   lazy val solved = broken.isEmpty && firstBrokenForSure == -1
 
   def unfold: Problem = Problem(List.fill(5)(springs).mkString("?"), List.fill(5)(broken).flatten)
+
+  val canSplit = springs.length > 10 && springs.indexOf('.', 1) > 1 && springs.indexOf('.', 1) < springs.length - 1
+
+  def split: Seq[(Problem, Problem)] = {
+    val possibleSplitPoints = springs.indices.filter(springs.charAt(_) == '.')
+    val at = possibleSplitPoints(possibleSplitPoints.length / 2)
+    val left = springs.substring(0, at)
+    val right = springs.substring(at)
+    (0 to broken.length).map(numLeftBroken =>
+      (Problem(left, broken.take(numLeftBroken)), Problem(right, broken.drop(numLeftBroken))))
+  }
 }
 
 val input = loadPackets(List("day12.txt")).map {
@@ -34,13 +41,20 @@ def memoize[K, V](f: K => V): K => V = {
   k => cache.getOrElseUpdate(k, f(k))
 }
 
-def memoizedOptions: (Problem => Long) = memoize((problem) =>
-  if (problem.done)
+def memoizedOptions: (Problem => Long) = {
+  def options(problem: Problem): Long = if (problem.done)
     if (problem.solved) 1 else 0
-  else (0 to problem.undecided).par.flatMap(problem.startingWith)
-    .map(memoizedOptions)
-    .sum
-)
+  else if (problem.canSplit)
+    problem.split.map {
+      case (left, right) => memoizedOptions(left) * memoizedOptions(right)
+    }.sum
+  else {
+    (0 to problem.undecided).flatMap(problem.startingWith)
+      .map(memoizedOptions)
+      .sum
+  }
+  memoize(options)
+}
 
 val part1 = time {
   input.map(memoizedOptions).sum
@@ -49,5 +63,5 @@ time {
   memoizedOptions(input(3).unfold)
 }
 val part2 = time {
-  input.map(_.unfold).map(memoizedOptions).sum
+  input.map(_.unfold).par.map(memoizedOptions).sum
 }
