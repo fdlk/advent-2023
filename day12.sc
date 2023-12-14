@@ -13,20 +13,20 @@ def memoize[K, V](f: K => V): K => V = {
   k => cache.getOrElseUpdate(k, f(k))
 }
 
-val memoizedOptions: Problem => Long = memoize({
+val options: Problem => Long = memoize({
   case Problem(springs, Nil) => if (springs.contains('#')) 0 else 1
   case Problem("", _) => 0
-  case Problem(s"?${rest}", broken) => memoizedOptions(Problem(s".${rest}", broken)) +
-    memoizedOptions(Problem(s"#${rest}", broken))
-  case Problem(s".${rest}", broken) => memoizedOptions(Problem(rest, broken))
-  case Problem(springs, broken) if springs.length >= broken.head && !springs.take(broken.head).contains('.') =>
+  case Problem(s"?${rest}", broken) => options(Problem(s".${rest}", broken)) +
+    options(Problem(s"#${rest}", broken))
+  case Problem(s".${rest}", broken) => options(Problem(rest, broken))
+  case Problem(springs, broken) if springs.length < broken.head || springs.take(broken.head).contains('.') => 0
+  case Problem(springs, broken) =>
     springs.drop(broken.head).headOption match {
       case Some('#') => 0
-      case Some(_) => memoizedOptions(Problem(springs.drop(broken.head + 1), broken.tail))
-      case _ => memoizedOptions(Problem(springs.drop(broken.head), broken.tail))
+      case Some(_) => options(Problem(springs.drop(broken.head + 1), broken.tail))
+      case _ => options(Problem(springs.drop(broken.head), broken.tail))
     }
-  case _ => 0
 })
 
-val part1 = input.map(memoizedOptions).sum
-val part2 = input.map(_.unfold).map(memoizedOptions).sum
+val part1 = input.map(options).sum
+val part2 = input.map(_.unfold).map(options).sum
