@@ -13,7 +13,7 @@ def memoize[K, V](f: K => V): K => V = {
   k => cache.getOrElseUpdate(k, f(k))
 }
 
-def memoizedOptions: Problem => Long = memoize({
+val memoizedOptions: Problem => Long = memoize({
   case Problem(springs, Nil) => if (springs.contains('#')) 0 else 1
   case Problem("", _) => 0
   case Problem(s"?${rest}", broken) => memoizedOptions(Problem(s".${rest}", broken)) +
@@ -29,7 +29,4 @@ def memoizedOptions: Problem => Long = memoize({
 })
 
 val part1 = input.map(memoizedOptions).sum
-time {
-  memoizedOptions(input(3).unfold)
-}
-//val part2 = input.map(_.unfold).map(memoizedOptions).sum
+val part2 = input.map(_.unfold).map(memoizedOptions).sum
