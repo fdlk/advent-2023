@@ -1,9 +1,6 @@
-import common.{loadPackets, time}
-
-import scala.collection.parallel.CollectionConverters.seqIsParallelizable
+import common.loadPackets
 
 case class Problem(springs: String, broken: List[Int]) {
-  lazy val firstBrokenForSure = springs.indexOf('#')
   lazy val undecided = springs.length - broken.sum - (broken.length - 1)
 
   def startingWith(working: Int): Option[Problem] = {
@@ -12,23 +9,29 @@ case class Problem(springs: String, broken: List[Int]) {
       springs.substring(working, working + broken.head).forall(_ != '.') &&
       (broken.tail.isEmpty || ((springs.length > working + broken.head) && springs.charAt(working + broken.head) != '#')))) None
     else
-      Some(Problem(springs.substring(working + broken.head + (if(broken.length > 1) 1 else 0)), broken.tail))
+      Some(Problem(springs.substring(working + broken.head + (if (broken.length > 1) 1 else 0)), broken.tail))
   }
 
   lazy val done = broken.isEmpty
-  lazy val solved = broken.isEmpty && firstBrokenForSure == -1
+  lazy val solved = broken.isEmpty && !springs.contains('#')
 
   def unfold: Problem = Problem(List.fill(5)(springs).mkString("?"), List.fill(5)(broken).flatten)
 
-  val canSplit = springs.length > 10 && springs.indexOf('.', 1) > 1 && springs.indexOf('.', 1) < springs.length - 1
+  def sequenceFits(numBroken: Int, pos: Int): Boolean = {
+    // fit ".###." starting at pos
+    springs(pos) != '#' && !(pos + 1 to pos + numBroken).map(springs).contains('.') && springs(pos + numBroken + 1) != '#'
+  }
 
   def split: Seq[(Problem, Problem)] = {
-    val possibleSplitPoints = springs.indices.filter(springs.charAt(_) == '.')
-    val at = possibleSplitPoints(possibleSplitPoints.length / 2)
-    val left = springs.substring(0, at)
-    val right = springs.substring(at)
-    (0 to broken.length).map(numLeftBroken =>
-      (Problem(left, broken.take(numLeftBroken)), Problem(right, broken.drop(numLeftBroken))))
+    val splitBrokenAt = broken.length / 2
+    val numBroken = broken(splitBrokenAt)
+    val leftBroken = broken.take(splitBrokenAt)
+    val rightBroken = broken.drop(splitBrokenAt + 1)
+    val widthLeft = leftBroken.sum + leftBroken.length - 1
+    val widthRight = rightBroken.sum + rightBroken.length - 1
+    (widthLeft until (springs.length - widthRight - numBroken - 1))
+      .filter(pos => sequenceFits(numBroken, pos))
+      .map(pos => (Problem(springs.take(pos), leftBroken), Problem(springs.drop(pos + numBroken + 2), rightBroken)))
   }
 }
 
@@ -41,27 +44,17 @@ def memoize[K, V](f: K => V): K => V = {
   k => cache.getOrElseUpdate(k, f(k))
 }
 
-def memoizedOptions: (Problem => Long) = {
-  def options(problem: Problem): Long = if (problem.done)
+def memoizedOptions: Problem => Long = memoize(problem =>
+  if (problem.done)
     if (problem.solved) 1 else 0
-  else if (problem.canSplit)
+  else if (problem.broken.length > 2)
     problem.split.map {
       case (left, right) => memoizedOptions(left) * memoizedOptions(right)
     }.sum
-  else {
-    (0 to problem.undecided).flatMap(problem.startingWith)
-      .map(memoizedOptions)
-      .sum
-  }
-  memoize(options)
-}
+  else (0 to problem.undecided).flatMap(problem.startingWith)
+    .map(memoizedOptions)
+    .sum
+)
 
-val part1 = time {
-  input.map(memoizedOptions).sum
-}
-time {
-  memoizedOptions(input(3).unfold)
-}
-val part2 = time {
-  input.map(_.unfold).par.map(memoizedOptions).sum
-}
+val part1 = input.map(memoizedOptions).sum
+val part2 = input.map(_.unfold).map(memoizedOptions).sum
