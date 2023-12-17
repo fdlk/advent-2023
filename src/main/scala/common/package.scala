@@ -1,6 +1,9 @@
 import java.io.File
 import scala.annotation.tailrec
-import fastparse._, NoWhitespace._
+import fastparse._
+import NoWhitespace._
+
+import scala.collection.convert.ImplicitConversions.`iterable AsScalaIterable`
 
 package object common {
 
@@ -88,27 +91,32 @@ package object common {
 
 
   def aStarSearch[T](start: T, grid: Grid[T], isFinished: T => Boolean): Option[Int] = {
-    case class NodeInfo(costFromStart: Int, estimatedTotalCost: Int)
+    case class NodeInfo(node: T, costFromStart: Int, estimatedTotalCost: Int) extends Comparable[NodeInfo] {
+
+      override def compareTo(o: NodeInfo): Int = estimatedTotalCost.compareTo(o.estimatedTotalCost)
+    }
+    val open: java.util.PriorityQueue[NodeInfo] = new java.util.PriorityQueue()
+    open.add(NodeInfo(start, 0, grid.heuristicDistanceToFinish(start)))
 
     @tailrec
-    def loop(closed: Set[T], open: Map[T, NodeInfo]): Option[Int] = {
+    def loop(closed: Set[T]): Option[Int] = {
       if (open.isEmpty) return None
-      val (current, NodeInfo(currentCostFromStart, estimatedTotalCost)) = open.minBy(_._2.estimatedTotalCost)
+      val NodeInfo(current, currentCostFromStart, estimatedTotalCost) = open.poll()
       if (isFinished(current)) return Some(estimatedTotalCost)
-      loop(
-        closed + current,
-        grid.getNeighbours(current)
-          .filterNot(closed.contains)
-          .foldLeft(open - current) {
-            case (open, neighbor) =>
-              val neighborCostFromStart = currentCostFromStart + grid.moveCost(current, neighbor)
-              if (open.get(neighbor).exists(_.costFromStart <= neighborCostFromStart)) open
-              else open.updated(neighbor,
-                NodeInfo(neighborCostFromStart, neighborCostFromStart + grid.heuristicDistanceToFinish(neighbor)))
-          })
+      grid.getNeighbours(current)
+        .filterNot(closed.contains)
+        .foreach {
+          neighbor => {
+            val neighborCostFromStart = currentCostFromStart + grid.moveCost(current, neighbor)
+            if (!open.exists(nodeInfo => nodeInfo.node == neighbor && nodeInfo.costFromStart <= neighborCostFromStart)) {
+              open.removeIf(_.node == neighbor)
+              open.offer(NodeInfo(neighbor, neighborCostFromStart, neighborCostFromStart + grid.heuristicDistanceToFinish(neighbor)))
+            }
+          }
+        }
+      loop(closed + current)
     }
-
-    loop(Set(), Map(start -> NodeInfo(0, grid.heuristicDistanceToFinish(start))))
+    loop(Set())
   }
 
 
