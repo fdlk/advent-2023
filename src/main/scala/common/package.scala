@@ -79,16 +79,15 @@ package object common {
   }
 
   trait Grid[T] {
-    def heuristicDistance(from: T, to: T): Int
+    def heuristicDistanceToFinish(from: T): Int
 
     def getNeighbours(state: T): Iterable[T]
 
     def moveCost(from: T, to: T): Int
   }
 
-  def aStarSearch[T](start: T, finish: T, grid: Grid[T]): Option[Int] = aStarSearch2[T](start, finish, grid, _ == finish)
 
-  def aStarSearch2[T](start: T, finish: T, grid: Grid[T], isFinished: T => Boolean): Option[Int] = {
+  def aStarSearch[T](start: T, grid: Grid[T], isFinished: T => Boolean): Option[Int] = {
     case class NodeInfo(costFromStart: Int, estimatedTotalCost: Int)
 
     @tailrec
@@ -105,11 +104,11 @@ package object common {
               val neighborCostFromStart = currentCostFromStart + grid.moveCost(current, neighbor)
               if (open.get(neighbor).exists(_.costFromStart <= neighborCostFromStart)) open
               else open.updated(neighbor,
-                NodeInfo(neighborCostFromStart, neighborCostFromStart + grid.heuristicDistance(neighbor, finish)))
+                NodeInfo(neighborCostFromStart, neighborCostFromStart + grid.heuristicDistanceToFinish(neighbor)))
           })
     }
 
-    loop(Set(), Map(start -> NodeInfo(0, grid.heuristicDistance(start, finish))))
+    loop(Set(), Map(start -> NodeInfo(0, grid.heuristicDistanceToFinish(start))))
   }
 
 
