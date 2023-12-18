@@ -1,52 +1,75 @@
 import common.loadPackets
 
-import scala.annotation.tailrec
+case class Point(row: Int, col: Int) {
+  def move(direction: Char, amount: Int = 1): Point = direction match {
+    case 'R' => copy(col = col + amount)
+    case 'D' => copy(row = row + amount)
+    case 'L' => copy(col = col - amount)
+    case 'U' => copy(row = row - amount)
+  }
+}
 
-case class Instruction(direction: Char, amount: Int, color: String)
+case class Ditch(from: Point, to: Point, direction: Char) {
+  def crossesBelowRow(row: Int): Boolean = direction match {
+    case 'D' => (from.row until to.row).contains(row)
+    case 'U' => (to.row until from.row).contains(row)
+    case _ => false
+  }
 
-val input = loadPackets(List("day18.txt")).map{
+  def crossesAboveRow(row: Int): Boolean = crossesBelowRow(row - 1)
+}
+
+case class Instruction(direction: Char, amount: Int, color: String) {
+  def move(from: Point): Point = from.move(direction, amount)
+}
+
+val instructions = loadPackets(List("day18.txt")).map {
   case s"${direction} ${amount} (#${color})" => Instruction(direction.head, amount.toInt, color)
 }
 
-case class Point(row: Int, col: Int) {
-  def move(direction: Char): Point = direction match {
-    case 'R' => copy(col = col + 1)
-    case 'D' => copy(row = row + 1)
-    case 'L' => copy(col = col - 1)
-    case 'U' => copy(row = row - 1)
+val ditches: List[Ditch] = instructions.scanLeft[(Point, Option[Ditch])]((Point(0, 0), None)) {
+  case ((from, _), instruction) => {
+    val to = instruction.move(from)
+    (to, Some(Ditch(from, to, instruction.direction)))
   }
+}.tail.map(_._2.get)
 
-  def neighbors: Set[Point] = Set('R', 'D', 'L', 'U').map(move)
+def contain(a: Range, b: Range): Boolean = a.start <= b.start && a.end >= b.end
+
+def combine(above: List[Range], below: List[Range]): List[Range] = {
+  val result = (above, below) match {
+    case (_, Nil) => Nil
+    case (Nil, _) => Nil
+    case (a :: restAbove, b :: restBelow) if a == b => a :: combine(restAbove, restBelow)
+    case (a :: restAbove, b :: restBelow) if contain(a, b) => b :: combine((b.end until a.end) :: restAbove, restBelow)
+    case (a :: restAbove, b :: restBelow) if contain(b, a) => a :: combine(restAbove, (a.end until b.end) :: restBelow)
+    case (a :: restAbove, b :: _) if a.end <= b.start => combine(restAbove, below)
+    case (a :: _, b :: restBelow) if b.end <= a.start => combine(above, restBelow)
+    case (a :: restAbove, b :: restBelow) if a.start <= b.start =>
+      (b.start until a.end) :: combine(restAbove, (a.end until b.end) :: restBelow)
+    case (a :: restAbove, b :: restBelow) =>
+      (a.start until b.end) :: combine((b.end until a.end) :: restAbove, restBelow)
+  }
+  result.filter(_.nonEmpty)
 }
 
-val points = input.flatMap(instruction => List.fill(instruction.amount)(instruction.direction))
-  .scanLeft(Point(0, 0))((point, direction) => point.move(direction)).toSet
+def numHolesInRow(row: Int) = {
+  val intervalsAbove = ditches.filter(_.crossesAboveRow(row)).map(_.from.col).sorted
+    .grouped(2).map { case List(a, b) => a + 1 until b }.toList
+  val intervalsBelow = ditches.filter(_.crossesBelowRow(row)).map(_.from.col).sorted
+    .grouped(2).map { case List(a, b) => a + 1 until b }.toList
+  combine(intervalsAbove, intervalsBelow)
+    .map(_.length).sum
+}
 
-val rows = points.map(_.row).toList.sorted
-val cols = points.map(_.col).toList.sorted
+val trench = instructions.map(_.amount).sum
 
-val pointInside = cols.map(col => Point(rows(1), col)).dropWhile(!points(_)).find(!points(_)).get
+val inners = ditches.map(_.to.row).flatMap(x => x - 1 to x + 1).sorted.distinct
+  .map(row => (row, numHolesInRow(row))).sliding(2).toList
+  .map { case List((from, num), (to, _)) => (from until to).length * num }
+  .sum
 
-//val map = rows.map(row =>
-//  row + cols.map(col =>Point(row, col))
-//    .map{
-//      case point if point == pointInside => '*'
-//      case point if points(point) => '#'
-//      case _ => '.'
-//    }.mkString
-//).mkString("\n")
-//
-//println(map)
+val part1 = trench + inners
 
-
-@tailrec
-def floodFill(open: Set[Point], inside: Set[Point] = points): Int =
-  if (open.isEmpty)
-    inside.size
-  else {
-    val known = inside ++ open
-    val found = open.flatMap(_.neighbors).filter(!known(_))
-    floodFill(found, known)
-  }
-
-floodFill(Set(pointInside))
+// 28911
+//numHolesInRow(7)
