@@ -9,7 +9,7 @@ type XMAS = Char
 
 case class Part(x: Int, m: Int, a: Int, s: Int)
 
-case class Rule(property: XMAS, comparison: Char, value: Int, routing: String) {
+case class Rule(property: XMAS, comparison: Char, value: Int, destination: String) {
   def matches(part: Part): Boolean = {
     val partValue = property match {
       case 'x' => part.x
@@ -30,7 +30,7 @@ case class Rule(property: XMAS, comparison: Char, value: Int, routing: String) {
 }
 
 case class Workflow(name: WorkflowName, rules: List[Rule], default: WorkflowName) {
-  def route(part: Part): String = rules.find(_.matches(part)).map(_.routing).getOrElse(default)
+  def route(part: Part): String = rules.find(_.matches(part)).map(_.destination).getOrElse(default)
 }
 
 val regex = """([xmas])([<>])(.+):(.+)""".r
@@ -65,31 +65,32 @@ def splitRange(range: Range, edge: Int): List[Range] =
   if (!range.contains(edge)) List(range)
   else List(range.start until edge, edge to range.last)
 
-type State = Map[XMAS, Range]
-def numParts(ranges: State): Long = ranges.values.map(_.size.toLong).product
+type Orthope = Map[XMAS, Range]
+def numParts(orthope: Orthope): Long = orthope.values.map(_.size.toLong).product
 
-def part(ranges: State): Part = Part(ranges('x').start, ranges('m').start, ranges('a').start, ranges('s').start)
+def part(orthope: Orthope): Part = Part(orthope('x').start, orthope('m').start, orthope('a').start, orthope('s').start)
 
-def split(ranges: State, rule: Rule): (State, State) = {
-  val (yes, no) = splitRange(ranges(rule.property), rule.edge)
-    .map(range => ranges.updated(rule.property, range))
+def split(orthope: Orthope, rule: Rule): (Orthope, Orthope) = {
+  val (yes, no) = splitRange(orthope(rule.property), rule.edge)
+    .map(range => orthope.updated(rule.property, range))
     .partition(ranges => rule.matches(part(ranges)))
   (yes.head, no.head)
 }
 
 @tailrec
-def numAcceptable(options: List[(State, WorkflowName)], soFar: Long): Long = options match {
+def numAcceptable(orthopes: List[(Orthope, WorkflowName)], soFar: Long = 0): Long = orthopes match {
   case Nil => soFar
-  case (ranges, "A") :: rest => numAcceptable(rest, soFar + numParts(ranges))
+  case (orthope, "A") :: rest => numAcceptable(rest, soFar + numParts(orthope))
   case (_, "R") :: rest => numAcceptable(rest, soFar)
-  case (ranges, workflowName) :: rest =>
+  case (orthope, workflowName) :: rest =>
     val Workflow(_, rules, default) = workflows(workflowName)
-    val (unroutedState, routings) = rules.foldLeft[(State, List[(State, WorkflowName)])]((ranges, List()))({
-      case ((ranges, routed), rule) =>
-        val (yes, no) = split(ranges, rule)
-        (no, (yes, rule.routing) :: routed)
+    val (unroutedOrthope, routings) = rules.foldLeft[(Orthope, List[(Orthope, WorkflowName)])]((orthope, List()))({
+      case ((notYetRouted, routedSoFar), rule) =>
+        val (yes, no) = split(notYetRouted, rule)
+        (no, (yes, rule.destination) :: routedSoFar)
     })
-    numAcceptable((unroutedState, default) :: routings ::: rest, soFar)
+    numAcceptable((unroutedOrthope, default) :: routings ::: rest, soFar)
 }
 
-numAcceptable(List(("xmas".map(_ -> (1 to 4000)).toMap, "in")), 0)
+val start: Orthope = "xmas".map(_ -> (1 to 4000)).toMap
+numAcceptable(List((start, "in")))
