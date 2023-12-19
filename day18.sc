@@ -19,12 +19,14 @@ case class Ditch(from: Point, to: Point, direction: Char) {
   def crossesAboveRow(row: Int): Boolean = crossesBelowRow(row - 1)
 }
 
-case class Instruction(direction: Char, amount: Int, color: String) {
+case class Instruction(direction: Char, amount: Int) {
   def move(from: Point): Point = from.move(direction, amount)
 }
 
+val regex = """.*\(#(\w{5})(\w)\)""".r
+
 val instructions = loadPackets(List("day18.txt")).map {
-  case s"${direction} ${amount} (#${color})" => Instruction(direction.head, amount.toInt, color)
+  case regex(hex, direction) => Instruction("RDLU"(direction.toInt), Integer.parseInt(hex, 16))
 }
 
 val ditches: List[Ditch] = instructions.scanLeft[(Point, Option[Ditch])]((Point(0, 0), None)) {
@@ -58,18 +60,14 @@ def numHolesInRow(row: Int) = {
     .grouped(2).map { case List(a, b) => a + 1 until b }.toList
   val intervalsBelow = ditches.filter(_.crossesBelowRow(row)).map(_.from.col).sorted
     .grouped(2).map { case List(a, b) => a + 1 until b }.toList
-  combine(intervalsAbove, intervalsBelow)
-    .map(_.length).sum
+  combine(intervalsAbove, intervalsBelow).map(_.length).sum
 }
 
 val trench = instructions.map(_.amount).sum
 
 val inners = ditches.map(_.to.row).flatMap(x => x - 1 to x + 1).sorted.distinct
   .map(row => (row, numHolesInRow(row))).sliding(2).toList
-  .map { case List((from, num), (to, _)) => (from until to).length * num }
+  .map { case List((from, num), (to, _)) => (from until to).length * num.toLong }
   .sum
 
-val part1 = trench + inners
-
-// 28911
-//numHolesInRow(7)
+val part2 = trench + inners
