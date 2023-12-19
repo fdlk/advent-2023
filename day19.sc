@@ -4,9 +4,12 @@ import scala.annotation.tailrec
 
 val input = loadPackets(List("day19.txt"))
 
+type WorkflowName = String
+type XMAS = Char
+
 case class Part(x: Int, m: Int, a: Int, s: Int)
 
-case class Rule(property: Char, comparison: Char, value: Int, routing: String) {
+case class Rule(property: XMAS, comparison: Char, value: Int, routing: String) {
   def matches(part: Part): Boolean = {
     val partValue = property match {
       case 'x' => part.x
@@ -26,7 +29,7 @@ case class Rule(property: Char, comparison: Char, value: Int, routing: String) {
   }
 }
 
-case class Workflow(name: String, rules: List[Rule], default: String) {
+case class Workflow(name: WorkflowName, rules: List[Rule], default: WorkflowName) {
   def route(part: Part): String = rules.find(_.matches(part)).map(_.routing).getOrElse(default)
 }
 
@@ -60,41 +63,33 @@ val part1 = parts.filter(accept(_, "in")).map(part => part.x + part.m + part.a +
 
 def splitRange(range: Range, edge: Int): List[Range] =
   if (!range.contains(edge)) List(range)
-  else List(range.start until edge, edge until range.end)
+  else List(range.start until edge, edge to range.last)
 
-case class State(ranges: Map[Char, Range]) {
-  def size: Long = ranges.values.map(_.size.toLong).product
+type State = Map[XMAS, Range]
+def numParts(ranges: State): Long = ranges.values.map(_.size.toLong).product
 
-  val part: Part = Part(ranges('x').start, ranges('m').start, ranges('a').start, ranges('s').start)
+def part(ranges: State): Part = Part(ranges('x').start, ranges('m').start, ranges('a').start, ranges('s').start)
 
-  def split(rule: Rule): (State, State) = {
-    val (yes, no) = splitRange(ranges(rule.property), rule.edge)
-      .map(range => copy(ranges = ranges.updated(rule.property, range)))
-      .partition(state => rule.matches(state.part))
-    (yes.head, no.head)
-  }
+def split(ranges: State, rule: Rule): (State, State) = {
+  val (yes, no) = splitRange(ranges(rule.property), rule.edge)
+    .map(range => ranges.updated(rule.property, range))
+    .partition(ranges => rule.matches(part(ranges)))
+  (yes.head, no.head)
 }
 
 @tailrec
-def numAcceptable(options: List[(State, String)], soFar: Long): Long = {
-  if (options.isEmpty) soFar
-  else {
-    val (state, workflowName) = options.head
-    workflowName match {
-      case "A" => numAcceptable(options.tail, soFar + state.size)
-      case "R" => numAcceptable(options.tail, soFar)
-      case _ => {
-        val workflow = workflows(workflowName)
-        val (unroutedState, routings): (State, List[(State, String)]) =
-          workflow.rules.foldLeft((state, List()))({
-            case ((state, routed), rule) =>
-              val (yes, no) = state.split(rule)
-              (no, (yes, rule.routing) :: routed)
-          })
-        numAcceptable((unroutedState, workflow.default) :: routings ::: options.tail, soFar)
-      }
-    }
-  }
+def numAcceptable(options: List[(State, WorkflowName)], soFar: Long): Long = options match {
+  case Nil => soFar
+  case (ranges, "A") :: rest => numAcceptable(rest, soFar + numParts(ranges))
+  case (_, "R") :: rest => numAcceptable(rest, soFar)
+  case (ranges, workflowName) :: rest =>
+    val Workflow(_, rules, default) = workflows(workflowName)
+    val (unroutedState, routings) = rules.foldLeft[(State, List[(State, WorkflowName)])]((ranges, List()))({
+      case ((ranges, routed), rule) =>
+        val (yes, no) = split(ranges, rule)
+        (no, (yes, rule.routing) :: routed)
+    })
+    numAcceptable((unroutedState, default) :: routings ::: rest, soFar)
 }
 
-numAcceptable(List((State("xmas".map(_ -> (1 until 4001)).toMap), "in")), 0)
+numAcceptable(List(("xmas".map(_ -> (1 to 4000)).toMap, "in")), 0)
