@@ -1,5 +1,7 @@
 import common.loadPackets
 
+val input = loadPackets(List("day18.txt"))
+
 case class Point(row: Int, col: Int) {
   def move(direction: Char, amount: Int = 1): Point = direction match {
     case 'R' => copy(col = col + amount)
@@ -15,59 +17,52 @@ case class Ditch(from: Point, to: Point, direction: Char) {
     case 'U' => (to.row until from.row).contains(row)
     case _ => false
   }
-
-  def crossesAboveRow(row: Int): Boolean = crossesBelowRow(row - 1)
 }
 
 case class Instruction(direction: Char, amount: Int) {
   def move(from: Point): Point = from.move(direction, amount)
 }
 
-val regex = """.*\(#(\w{5})(\w)\)""".r
-
-val instructions = loadPackets(List("day18.txt")).map {
-  case regex(hex, direction) => Instruction("RDLU"(direction.toInt), Integer.parseInt(hex, 16))
-}
-
-val ditches: List[Ditch] = instructions.scanLeft[(Point, Option[Ditch])]((Point(0, 0), None)) {
-  case ((from, _), instruction) => {
-    val to = instruction.move(from)
-    (to, Some(Ditch(from, to, instruction.direction)))
-  }
-}.tail.map(_._2.get)
-
 def contain(a: Range, b: Range): Boolean = a.start <= b.start && a.end >= b.end
 
-def combine(above: List[Range], below: List[Range]): List[Range] = {
-  val result = (above, below) match {
-    case (_, Nil) => Nil
-    case (Nil, _) => Nil
-    case (a :: restAbove, b :: restBelow) if a == b => a :: combine(restAbove, restBelow)
-    case (a :: restAbove, b :: restBelow) if contain(a, b) => b :: combine((b.end until a.end) :: restAbove, restBelow)
-    case (a :: restAbove, b :: restBelow) if contain(b, a) => a :: combine(restAbove, (a.end until b.end) :: restBelow)
-    case (a :: restAbove, b :: _) if a.end <= b.start => combine(restAbove, below)
-    case (a :: _, b :: restBelow) if b.end <= a.start => combine(above, restBelow)
-    case (a :: restAbove, b :: restBelow) if a.start <= b.start =>
-      (b.start until a.end) :: combine(restAbove, (a.end until b.end) :: restBelow)
-    case (a :: restAbove, b :: restBelow) =>
-      (a.start until b.end) :: combine((b.end until a.end) :: restAbove, restBelow)
+def intersect(above: List[Range], below: List[Range]): List[Range] =
+  (above ::: below).flatMap(range => List(range.start, range.end)).distinct.sorted.sliding(2)
+    .toList.map { case List(a, b) => a until b }
+    .filter(candidate => above.exists(a => contain(a, candidate)) && below.exists(b => contain(b, candidate)))
+
+def computePoolSize(instructions: List[Instruction]): Long = {
+  val points: List[Point] = instructions.scanLeft(Point(0, 0))((point, instruction) => instruction.move(point))
+  val ditches: List[Ditch] = points.sliding(2).zip(instructions).map {
+    case (List(from, to), Instruction(direction, _)) => Ditch(from, to, direction)
+  }.toList
+
+  def numHolesInRow(row: Int): Int = {
+    // Check where the centers of vertical ditches cross the top and bottom lines of this row
+    // The ranges between those crossings are the insides of the trenches.
+    // Now combine these two lists of intervals to determine the columns on this row
+    // that are going to get dug out.
+    // These are the columns where the top and bottom ranges intersect.
+    val intervalsAbove = ditches.filter(_.crossesBelowRow(row - 1)).map(_.from.col).sorted
+      .grouped(2).map { case List(a, b) => a + 1 until b }.toList
+    val intervalsBelow = ditches.filter(_.crossesBelowRow(row)).map(_.from.col).sorted
+      .grouped(2).map { case List(a, b) => a + 1 until b }.toList
+    intersect(intervalsAbove, intervalsBelow).map(_.length).sum
   }
-  result.filter(_.nonEmpty)
+
+  val trench = instructions.map(_.amount).sum
+  val interestingRows = ditches.map(_.to.row).flatMap(x => x to x + 1).sorted.distinct
+  val inners = interestingRows
+    .map(row => (row, numHolesInRow(row))).sliding(2).toList
+    .map { case List((from, num), (to, _)) => (from until to).length * num.toLong }
+    .sum
+  trench + inners
 }
 
-def numHolesInRow(row: Int) = {
-  val intervalsAbove = ditches.filter(_.crossesAboveRow(row)).map(_.from.col).sorted
-    .grouped(2).map { case List(a, b) => a + 1 until b }.toList
-  val intervalsBelow = ditches.filter(_.crossesBelowRow(row)).map(_.from.col).sorted
-    .grouped(2).map { case List(a, b) => a + 1 until b }.toList
-  combine(intervalsAbove, intervalsBelow).map(_.length).sum
-}
+val part1 = computePoolSize(input.map {
+  case s"${direction} ${amount} (#${_})" => Instruction(direction.head, amount.toInt)
+})
 
-val trench = instructions.map(_.amount).sum
-
-val inners = ditches.map(_.to.row).flatMap(x => x - 1 to x + 1).sorted.distinct
-  .map(row => (row, numHolesInRow(row))).sliding(2).toList
-  .map { case List((from, num), (to, _)) => (from until to).length * num.toLong }
-  .sum
-
-val part2 = trench + inners
+val regex = """.*\(#(\w{5})(\w)\)""".r
+val part2 = computePoolSize(input.map {
+  case regex(hex, direction) => Instruction("RDLU"(direction.toInt), Integer.parseInt(hex, 16))
+})
