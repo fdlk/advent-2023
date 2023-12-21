@@ -1,11 +1,17 @@
 import common.loadPackets
 
+import scala.annotation.tailrec
+
 sealed trait HighOrLow
+
 case object High extends HighOrLow
+
 case object Low extends HighOrLow
 
 sealed trait OnOrOff
+
 case object On extends OnOrOff
+
 case object Off extends OnOrOff
 
 val input = loadPackets(List("day20.txt"))
@@ -17,7 +23,19 @@ val destinations: Destinations = input.map({
 }).toMap
 
 type FlipFlops = Map[String, OnOrOff]
+val flipFlops: FlipFlops = input.flatMap {
+  case regex("%", name, _) => Some(name -> Off)
+  case _ => None
+}.toMap
+
 type Conjunctions = Map[String, Map[String, HighOrLow]]
+val conjunctions: Conjunctions = input.flatMap {
+  case regex("&", name, _) => Some(name -> Map[String, HighOrLow]().withDefaultValue(Low))
+  case _ => None
+}.toMap[String, Map[String, HighOrLow]]
+
+val inputs: Map[String, List[String]] = conjunctions.keys.map(conjunction =>
+    conjunction -> destinations.filter(_._2.contains(conjunction)).keys.toList).toMap
 
 case class Pulse(from: String, pulse: HighOrLow, to: String)
 
@@ -41,8 +59,7 @@ case class State(flipFlops: FlipFlops, conjunctions: Conjunctions, pulses: List[
 
   def conjunction(pulse: HighOrLow, from: String, to: String): State = {
     val lastPulse: Map[String, HighOrLow] = conjunctions(to).updated(from, pulse)
-    val inputs = destinations.filter(_._2.contains(to)).keys
-    val pulseEmitted = if (inputs.map(lastPulse).forall(_ == High)) Low else High
+    val pulseEmitted = if (inputs(to).map(lastPulse).forall(_ == High)) Low else High
     val emitted = destinations(to).map(destination => Pulse(to, pulseEmitted, destination))
     copy(conjunctions = conjunctions.updated(to, lastPulse), pulses = pulses.tail ::: emitted)
   }
@@ -62,17 +79,6 @@ case class State(flipFlops: FlipFlops, conjunctions: Conjunctions, pulses: List[
     case _ => dropPulse()
   }
 }
-
-val flipFlops: FlipFlops = input.flatMap {
-  case regex("%", name, _) => Some(name -> Off)
-  case _ => None
-}.toMap
-
-val conjunctions: Conjunctions = input.flatMap {
-  case regex("&", name, _) => Some(name -> Map[String, HighOrLow]().withDefaultValue(Low))
-  case _ => None
-}.toMap[String, Map[String, HighOrLow]]
-
 val initialState = State(flipFlops = flipFlops, conjunctions = conjunctions, pulses = List())
 
 def pushButtonPulses(state: State): List[Pulse] =
@@ -92,3 +98,16 @@ val iterations = LazyList.iterate((initialState, 0, 0)) { case (state, highs, lo
 
 val (_, highs, lows) = iterations(1000)
 val part1 = highs * lows * 1L
+
+@tailrec
+def part2(state: State, buttonPresses: Long = 0): Long = {
+  val iterations = LazyList.iterate(state.button())(_.next()).takeWhile(_.pulses.nonEmpty).toList
+  if (iterations.map(_.pulses.head).exists {
+    case Pulse(_, Low, "rx") => true
+    case _ => false
+  })
+    buttonPresses
+  else part2(iterations.last.next(), buttonPresses + 1)
+}
+
+part2(initialState)
