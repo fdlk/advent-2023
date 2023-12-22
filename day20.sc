@@ -1,17 +1,12 @@
-import common.loadPackets
-
+import common.{lcm, loadPackets}
 import scala.annotation.tailrec
 
 sealed trait HighOrLow
-
 case object High extends HighOrLow
-
 case object Low extends HighOrLow
 
 sealed trait OnOrOff
-
 case object On extends OnOrOff
-
 case object Off extends OnOrOff
 
 val input = loadPackets(List("day20.txt"))
@@ -100,14 +95,14 @@ val (_, highs, lows) = iterations(1000)
 val part1 = highs * lows * 1L
 
 @tailrec
-def part2(state: State, buttonPresses: Long = 0): Long = {
+def buttonPressesTillInputFires(input: String)(state: State, buttonPresses: Long = 0): Long = {
   val iterations = LazyList.iterate(state.button())(_.next()).takeWhile(_.pulses.nonEmpty).toList
   if (iterations.map(_.pulses.head).exists {
-    case Pulse(_, Low, "rx") => true
+    case Pulse(from, High, "ls") => from == input
     case _ => false
   })
     buttonPresses
-  else part2(iterations.last.next(), buttonPresses + 1)
+  else buttonPressesTillInputFires(input)(iterations.last.next(), buttonPresses + 1)
 }
 
-part2(initialState)
+val part2 = lcm(inputs("ls").map(buttonPressesTillInputFires(_)(initialState) + 1))
