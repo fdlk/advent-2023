@@ -1,3 +1,5 @@
+import Jama.Matrix
+
 val input = common.loadPackets(List("day24.txt"))
 
 case class Point(x: Long, y: Long, z: Long)
@@ -36,46 +38,20 @@ val part1 = hailstones.combinations(2)
   .count { case (x, y) => x > min && x < max && y > min && y < max }
 
 def abcd(h1: Hailstone, h2: Hailstone) = (
-  h2.velocity.y - h1.velocity.y,
-  h1.velocity.x - h2.velocity.x,
-  h1.pos.y - h2.pos.y,
-  h2.pos.x - h1.pos.x,
-  h1.velocity.x * h1.pos.y - h2.velocity.x * h2.pos.y + h2.pos.x * h2.velocity.y - h1.pos.x * h1.velocity.y
+  Array(h2.velocity.y - h1.velocity.y,
+    h1.velocity.x - h2.velocity.x,
+    h1.pos.y - h2.pos.y,
+    h2.pos.x - h1.pos.x).map(_.toDouble),
+  (h1.velocity.x * h1.pos.y - h2.velocity.x * h2.pos.y + h2.pos.x * h2.velocity.y - h1.pos.x * h1.velocity.y).toDouble
 )
 
-var coefficients = hailstones.combinations(2).map {
+var coefficients = hailstones.combinations(2).take(4).toArray.map {
   case List(h1, h2) => abcd(h1, h2)
-}.toList
+}
 
-coefficients.mkString("\n")
-/*
-Wolfram alpha:
-invert matrix {(117,69,102814695089976,16915576153641), (66,78,137613439140084,5835907432620), (-552,199,-264204312577182,87881303532876), (-251,-29,-137736616452020,51123614927205)} * (47990945912805363, 28596076416021090, -92338590912830013, -90196889386570431)
-
-1/37309861881398479661210980084296(344136196137413521223503801716 | -333009893657435680943585345852 | 119170059201711136859759904 | -76057218276458952860096635764
-135350610042904326114990998946 | -105630423177850106104659597372 | 141694415024744561209868527644 | -276298420909869715678490094858
--284203253948040771 | 504895499177394386 | -75210509619738294 | 165687344796345807
-1000675684047809906 | -334604035453744024 | -121669631635684860 | 646043128910536638)
-*/
-
-val det = BigInt("37309861881398479661210980084296")
-
-val a1 = List(BigInt("344136196137413521223503801716"),
-  BigInt("-333009893657435680943585345852"),
-  BigInt("119170059201711136859759904"),
-  BigInt("-76057218276458952860096635764"))
-val a2 = List(BigInt("135350610042904326114990998946"),
-  BigInt("-105630423177850106104659597372"),
-  BigInt("141694415024744561209868527644"),
-  BigInt("-276298420909869715678490094858"))
-
-val x = List(47990945912805363L, 28596076416021090L, -92338590912830013L, -90196889386570431L)
-
-def inner(a: List[BigInt], x: List[Long]) = a.zip(x).map{case (a, b) => a * b}.sum
-val a = inner(a1, x) / det
-val b = inner(a2, x) / det
-val d = -193L
-val e = -230L
+val m: Matrix = new Matrix(coefficients.map(_._1))
+val x: Matrix = new Matrix(coefficients.map(c => Array(c._2)))
+val Array(a, b, d, e) = m.inverse().times(x).getArray.map(_(0)).map(_.round)
 
 val h1 = hailstones.head
 val t1 = (a - h1.pos.x) / (h1.velocity.x - d)

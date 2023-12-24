@@ -27,6 +27,8 @@ version := "1.0"
 
 libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.3"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
+// https://mvnrepository.com/artifact/gov.nist.math/jama
+libraryDependencies += "gov.nist.math" % "jama" % "1.0.3"
 
 // Here, `libraryDependencies` is a set of dependencies, and by using `+=`,
 // we're adding the scala-parser-combinators dependency to the set of dependencies
