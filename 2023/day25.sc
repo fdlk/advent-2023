@@ -1,3 +1,6 @@
+import scala.annotation.tailrec
+import scala.util.Random
+
 val input = common.loadPackets(List("day25.txt"))
 
 val connections = input.flatMap {
@@ -6,19 +9,13 @@ val connections = input.flatMap {
 
 val nodes = connections.flatten
 
-nodes.groupMapReduce(identity)(node => connections.count(_.contains(node)))(_+_)
+@tailrec
+def findCuts(connections: List[Set[String]], groups: Set[Set[String]]): Int =
+  if (groups.size == 2) {
+    groups.toList.map(_.size).product
+  } else {
+    val (unconnected, connected) = groups.partition(group => group.intersect(connections.head).isEmpty)
+    findCuts(connections.tail, unconnected + connected.flatten)
+  }
 
-// input for neato to determine which connections to cut
-println(connections.map(_.toList).map{
-  case a :: b :: Nil => s"${a} -- ${b}"
-}.mkString("\n"))
-
-val cut = Set(Set("ttv", "ztc"), Set("vfh", "bdj"), Set("rpd", "bnv"))
-
-def combine(groups: List[Set[String]], connection: Set[String]): List[Set[String]] = {
-  val (unconnected, connected) = groups.partition(group => group.intersect(connection).isEmpty)
-  (connected.toSet.flatten ++ connection) :: unconnected
-}
-
-val part1 = connections.filterNot(cut).foldLeft(List[Set[String]]())(combine)
-  .map(_.size).product
+val part1 = (1 to 50).map(_ => findCuts(Random.shuffle(connections), nodes.map(Set(_)).toSet)).max
