@@ -1,0 +1,9 @@
+repos:
+  - repo: https://github.com/LiquidFun/aoc_tiles
+    rev: 0.5.4
+    hooks:
+      - id: aoc-tiles
+#        args:
+#          - --overwrite-year=2023
+        #     - --language-sorting=jl,kt,py,rs
+        #     - --exclude-patterns="2021/*/*.apl,2021/*/*.py,2021/*/*.cpp"
